@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.db.models import Q
 from .models import Room, Topic, Message
-from .forms import RoomForm
+from .forms import RoomForm, UserForm
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -68,6 +68,7 @@ def logoutUser(request):
     return redirect('home')
 
 def home(request):
+    # Search bar
     q= request.GET.get('q') if request.GET.get('q') != None else ''
 
     rooms = Room.objects.filter(Q(topic__name__icontains=q) |
@@ -75,7 +76,7 @@ def home(request):
                                 Q(description__icontains=q)
                                 )
     room_number = rooms.count()
-    topics = Topic.objects.all()
+    topics = Topic.objects.all()[:5]
     room_messages = Message.objects.filter(Q(room__topic__name__icontains=q)).order_by('-created')
     context = {'rooms':rooms, 'topics': topics, 'room_number':room_number, 'room_messages':room_messages}
     return render(request, 'base/home.html', context)
@@ -178,3 +179,28 @@ def deleteMessage(request, pk):
         return redirect('home')
     
     return render(request, 'base/delete.html', {'obj': message})
+
+
+@login_required(login_url='login')
+def updateUser(request):
+    user = request.user
+    form = UserForm(instance=user) # refill data of user
+    
+    if request.method == 'POST':
+        form = UserForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('user-profile', pk=user.id)
+    context = {'form':form}
+    return render(request, 'base/update-user.html', context)    
+
+def topicsPage(request):
+    q = request.GET.get('q') if request.GET.get('q') else ''
+    topics = Topic.objects.filter(name__icontains=q)
+    context = {'topics':topics}
+    return render(request, 'base/topics.html', context)
+
+def activityPage(request):
+    room_messages = Message.objects.all()[0:5]
+    context = {'room_messages':room_messages}
+    return render(request, 'base/activity.html', context)
